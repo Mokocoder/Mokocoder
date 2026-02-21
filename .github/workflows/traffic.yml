@@ -96,8 +96,7 @@ jobs:
             for (const r of rows) {
               const short = r.name.split("/")[1];
               const link = `[${short}](https://github.com/${r.name})`;
-              lines.push(`${link} ⭐ ${r.stars}`);
-              lines.push(`views **${r.tv}** (${r.rv}) · clones **${r.tc}** (${r.rc})\n`);
+              lines.push(`${link} ⭐ ${r.stars}<br>views **${r.tv}** (${r.rv}) · clones **${r.tc}** (${r.rc})\n`);
               for (const k of Object.keys(totals)) totals[k] += r[k];
             }
 
