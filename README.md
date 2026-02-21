@@ -9,7 +9,4 @@
 
 [UE5_ClassNetCache_Extractor](https://github.com/Mokocoder/UE5_ClassNetCache_Extractor) ⭐ 0<br>views **11** (11) · clones **11** (11)
 
-[oci_socks5_all_in_one](https://github.com/Mokocoder/oci_socks5_all_in_one) ⭐ 0<br>views **8** (8) · clones **11** (11)
-
-**total** — views **288** (288) · clones **113** (113)
 <!-- TRAFFIC-END -->
