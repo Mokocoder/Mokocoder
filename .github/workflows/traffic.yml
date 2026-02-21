@@ -74,8 +74,6 @@ jobs:
             const cutoff = new Date(Date.now() - 14 * 864e5);
             const sum = (obj) =>
               Object.values(obj).reduce((a, d) => a + d.count, 0);
-            const sumUniq = (obj) =>
-              Object.values(obj).reduce((a, d) => a + d.uniques, 0);
             const recent = (obj) =>
               Object.entries(obj)
                 .filter(([d]) => new Date(d) >= cutoff)
@@ -85,33 +83,28 @@ jobs:
               .map(([name, d]) => ({
                 name,
                 stars: d.stars,
-                tv:  sum(d.views),    uv: sumUniq(d.views),   rv: recent(d.views),
-                tc:  sum(d.clones),   uc: sumUniq(d.clones),  rc: recent(d.clones),
-                since: [...Object.keys(d.views), ...Object.keys(d.clones)].sort()[0] ?? "-",
+                tv: sum(d.views),   rv: recent(d.views),
+                tc: sum(d.clones),  rc: recent(d.clones),
               }))
               .filter((r) => r.tv + r.tc > 0)
               .sort((a, b) => b.tv - a.tv);
 
             // ── render table ───────────────────────────────────
-            const today = new Date().toISOString().slice(0, 10);
-            const hdr = [
-              "Repository", "⭐", "Views 14d", "**Total Views**", "Unique",
-              "Clones 14d", "**Total Clones**", "Unique", "Since",
-            ];
-            const sep = hdr.map(() => "---");
-
+            const hdr  = ["Repo", "⭐", "Views", "Clones"];
+            const sep  = hdr.map(() => ":---:");
             const line = (cols) => `| ${cols.join(" | ")} |`;
             const lines = [line(hdr), line(sep)];
 
-            const totals = { rv: 0, tv: 0, uv: 0, rc: 0, tc: 0, uc: 0 };
+            const totals = { rv: 0, tv: 0, rc: 0, tc: 0 };
 
             for (const r of rows) {
               const short = r.name.split("/")[1];
               lines.push(
                 line([
                   `[${short}](https://github.com/${r.name})`,
-                  r.stars, r.rv, `**${r.tv}**`, r.uv,
-                  r.rc, `**${r.tc}**`, r.uc, r.since,
+                  r.stars,
+                  `**${r.tv}** (${r.rv})`,
+                  `**${r.tc}** (${r.rc})`,
                 ]),
               );
               for (const k of Object.keys(totals)) totals[k] += r[k];
@@ -120,16 +113,12 @@ jobs:
             lines.push(
               line([
                 "**Total**", "",
-                totals.rv, `**${totals.tv}**`, totals.uv,
-                totals.rc, `**${totals.tc}**`, totals.uc, "",
+                `**${totals.tv}** (${totals.rv})`,
+                `**${totals.tc}** (${totals.rc})`,
               ]),
             );
 
-            const table = [
-              `### Repository Traffic\n`,
-              `> Updated ${today} — cumulative since first collection\n`,
-              ...lines,
-            ].join("\n");
+            const table = lines.join("\n");
 
             // ── patch README ───────────────────────────────────
             const START = "<!-- TRAFFIC-START -->";
