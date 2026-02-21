@@ -89,34 +89,19 @@ jobs:
               .filter((r) => r.tv + r.tc > 0)
               .sort((a, b) => b.tv - a.tv);
 
-            // ── render table ───────────────────────────────────
-            const hdr  = ["Repo", "⭐", "Views", "Clones"];
-            const sep  = hdr.map(() => ":---:");
-            const line = (cols) => `| ${cols.join(" | ")} |`;
-            const lines = [line(hdr), line(sep)];
-
+            // ── render list ───────────────────────────────────
+            const lines = [];
             const totals = { rv: 0, tv: 0, rc: 0, tc: 0 };
 
             for (const r of rows) {
               const short = r.name.split("/")[1];
-              lines.push(
-                line([
-                  `[${short}](https://github.com/${r.name})`,
-                  r.stars,
-                  `**${r.tv}** (${r.rv})`,
-                  `**${r.tc}** (${r.rc})`,
-                ]),
-              );
+              const link = `[${short}](https://github.com/${r.name})`;
+              lines.push(`${link} ⭐ ${r.stars}`);
+              lines.push(`views **${r.tv}** (${r.rv}) · clones **${r.tc}** (${r.rc})\n`);
               for (const k of Object.keys(totals)) totals[k] += r[k];
             }
 
-            lines.push(
-              line([
-                "**Total**", "",
-                `**${totals.tv}** (${totals.rv})`,
-                `**${totals.tc}** (${totals.rc})`,
-              ]),
-            );
+            lines.push(`**total** — views **${totals.tv}** (${totals.rv}) · clones **${totals.tc}** (${totals.rc})`);
 
             const table = lines.join("\n");
 
