@@ -1,0 +1,167 @@
+name: traffic-stats
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore history from traffic branch
+        run: |
+          git fetch origin traffic 2>/dev/null || true
+          git show traffic:traffic_data.json 2>/dev/null > history.json \
+            || echo '{}' > history.json
+
+      - name: Collect traffic & rebuild README table
+        uses: actions/github-script@v7
+        env:
+          HISTORY_PATH: history.json
+        with:
+          github-token: ${{ secrets.TRAFFIC_TOKEN }}
+          script: |
+            const fs = require("fs");
+            const path = process.env.HISTORY_PATH;
+            const history = JSON.parse(fs.readFileSync(path, "utf8"));
+
+            // ── collect ────────────────────────────────────────
+            const repos = await github.paginate(
+              github.rest.repos.listForAuthenticatedUser,
+              { per_page: 100, type: "owner" },
+            );
+
+            const eligible = repos.filter((r) => !r.fork && !r.private);
+
+            await Promise.allSettled(
+              eligible.map(async (repo) => {
+                const opts = { owner: repo.owner.login, repo: repo.name, per: "day" };
+                const [views, clones] = await Promise.all([
+                  github.rest.repos.getViews(opts),
+                  github.rest.repos.getClones(opts),
+                ]);
+
+                const key = repo.full_name;
+                history[key] ??= { views: {}, clones: {}, stars: 0 };
+                history[key].stars = repo.stargazers_count;
+
+                for (const v of views.data.views) {
+                  history[key].views[v.timestamp.slice(0, 10)] = {
+                    count: v.count,
+                    uniques: v.uniques,
+                  };
+                }
+                for (const c of clones.data.clones) {
+                  history[key].clones[c.timestamp.slice(0, 10)] = {
+                    count: c.count,
+                    uniques: c.uniques,
+                  };
+                }
+              }),
+            );
+
+            fs.writeFileSync(path, JSON.stringify(history, null, 2));
+
+            // ── aggregate ──────────────────────────────────────
+            const cutoff = new Date(Date.now() - 14 * 864e5);
+            const sum = (obj) =>
+              Object.values(obj).reduce((a, d) => a + d.count, 0);
+            const sumUniq = (obj) =>
+              Object.values(obj).reduce((a, d) => a + d.uniques, 0);
+            const recent = (obj) =>
+              Object.entries(obj)
+                .filter(([d]) => new Date(d) >= cutoff)
+                .reduce((a, [, d]) => a + d.count, 0);
+
+            const rows = Object.entries(history)
+              .map(([name, d]) => ({
+                name,
+                stars: d.stars,
+                tv:  sum(d.views),    uv: sumUniq(d.views),   rv: recent(d.views),
+                tc:  sum(d.clones),   uc: sumUniq(d.clones),  rc: recent(d.clones),
+                since: [...Object.keys(d.views), ...Object.keys(d.clones)].sort()[0] ?? "-",
+              }))
+              .filter((r) => r.tv + r.tc > 0)
+              .sort((a, b) => b.tv - a.tv);
+
+            // ── render table ───────────────────────────────────
+            const today = new Date().toISOString().slice(0, 10);
+            const hdr = [
+              "Repository", "⭐", "Views 14d", "**Total Views**", "Unique",
+              "Clones 14d", "**Total Clones**", "Unique", "Since",
+            ];
+            const sep = hdr.map(() => "---");
+
+            const line = (cols) => `| ${cols.join(" | ")} |`;
+            const lines = [line(hdr), line(sep)];
+
+            const totals = { rv: 0, tv: 0, uv: 0, rc: 0, tc: 0, uc: 0 };
+
+            for (const r of rows) {
+              const short = r.name.split("/")[1];
+              lines.push(
+                line([
+                  `[${short}](https://github.com/${r.name})`,
+                  r.stars, r.rv, `**${r.tv}**`, r.uv,
+                  r.rc, `**${r.tc}**`, r.uc, r.since,
+                ]),
+              );
+              for (const k of Object.keys(totals)) totals[k] += r[k];
+            }
+
+            lines.push(
+              line([
+                "**Total**", "",
+                totals.rv, `**${totals.tv}**`, totals.uv,
+                totals.rc, `**${totals.tc}**`, totals.uc, "",
+              ]),
+            );
+
+            const table = [
+              `### Repository Traffic\n`,
+              `> Updated ${today} — cumulative since first collection\n`,
+              ...lines,
+            ].join("\n");
+
+            // ── patch README ───────────────────────────────────
+            const START = "<!-- TRAFFIC-START -->";
+            const END   = "<!-- TRAFFIC-END -->";
+
+            let readme = fs.readFileSync("README.md", "utf8");
+
+            if (readme.includes(START) && readme.includes(END)) {
+              readme = readme.replace(
+                new RegExp(`${START}[\\s\\S]*?${END}`),
+                `${START}\n${table}\n${END}`,
+              );
+            } else {
+              readme += `\n${START}\n${table}\n${END}\n`;
+            }
+
+            fs.writeFileSync("README.md", readme);
+
+      - name: Push README
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git diff --staged --quiet && exit 0
+          git commit -m "docs: update traffic stats"
+          git push
+
+      - name: Push history to traffic branch
+        run: |
+          git checkout --orphan _traffic
+          git rm -rf .
+          mv history.json traffic_data.json
+          git add traffic_data.json
+          git commit -m "data: $(date -u +%F)"
+          git push origin _traffic:traffic --force
