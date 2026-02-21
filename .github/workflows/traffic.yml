@@ -33,6 +33,18 @@ jobs:
             const path = process.env.HISTORY_PATH;
             const history = JSON.parse(fs.readFileSync(path, "utf8"));
 
+            // ── pinned repos ──────────────────────────────────
+            const { viewer } = await github.graphql(`{
+              viewer {
+                pinnedItems(first: 6, types: REPOSITORY) {
+                  nodes { ... on Repository { nameWithOwner } }
+                }
+              }
+            }`);
+            const pinned = new Set(
+              viewer.pinnedItems.nodes.map((n) => n.nameWithOwner),
+            );
+
             // ── collect ────────────────────────────────────────
             const repos = await github.paginate(
               github.rest.repos.listForAuthenticatedUser,
@@ -80,6 +92,7 @@ jobs:
                 .reduce((a, [, d]) => a + d.count, 0);
 
             const rows = Object.entries(history)
+              .filter(([name]) => pinned.has(name))
               .map(([name, d]) => ({
                 name,
                 stars: d.stars,
@@ -91,16 +104,12 @@ jobs:
 
             // ── render list ───────────────────────────────────
             const lines = [];
-            const totals = { rv: 0, tv: 0, rc: 0, tc: 0 };
 
             for (const r of rows) {
               const short = r.name.split("/")[1];
               const link = `[${short}](https://github.com/${r.name})`;
               lines.push(`${link} ⭐ ${r.stars}<br>views **${r.tv}** (${r.rv}) · clones **${r.tc}** (${r.rc})\n`);
-              for (const k of Object.keys(totals)) totals[k] += r[k];
             }
-
-            lines.push(`**total** — views **${totals.tv}** (${totals.rv}) · clones **${totals.tc}** (${totals.rc})`);
 
             const table = lines.join("\n");
 
