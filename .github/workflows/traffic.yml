@@ -19,7 +19,7 @@ jobs:
       - name: Restore history from traffic branch
         run: |
           git fetch origin traffic 2>/dev/null || true
-          git show traffic:traffic_data.json 2>/dev/null > history.json \
+          git show origin/traffic:traffic_data.json 2>/dev/null > history.json \
             || echo '{}' > history.json
 
       - name: Collect traffic & rebuild README table
