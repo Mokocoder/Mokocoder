@@ -7,7 +7,7 @@
 
 [RepSeedDumper](https://github.com/Mokocoder/RepSeedDumper) ⭐ 0<br>views **213** (11) · clones **113** (2)
 
-[TIS-100-KoreanPatch](https://github.com/Mokocoder/TIS-100-KoreanPatch) ⭐ 6<br>views **152** (8) · clones **70** (0)
+[TIS-100-KoreanPatch](https://github.com/Mokocoder/TIS-100-KoreanPatch) ⭐ 6<br>views **152** (7) · clones **70** (0)
 
 [RepSeedResolver](https://github.com/Mokocoder/RepSeedResolver) ⭐ 0<br>views **128** (2) · clones **120** (2)
 
